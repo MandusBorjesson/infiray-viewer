@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infiray-viewer"
+version = "0.1.0"
+description = "Video viewer for Infiray P2 Pro thermal camera"
+requires-python = ">=3.9"
+keywords = []
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "opencv-python==4.10.0.84",
+    "numpy==2.2.1",
+    "tk==0.1.0",
+]
+
+[project.scripts]
+infiray-viewer = "thermal:main"
