@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-import tkinter as tk
-from tkinter import ttk
 
 def yuyv422_to_gray(img):
     return img[..., 0]
@@ -23,14 +21,12 @@ def mouse_callback(event, x, y, flags, param):
     if event == cv2.EVENT_MOUSEMOVE:
         cursor_x, cursor_y = x, y
 
-min_temp = 20
-max_temp = 40
+
+selected_cmap = "COLORMAP_MAGMA"
 temp_scale = 4
 
 cv2.namedWindow("Grayscale", cv2.WINDOW_NORMAL)
-
-# Set the initial window sizes to 800x600
-cv2.resizeWindow("Grayscale", 800, 600)
+# cv2.resizeWindow("Grayscale", 800, 600)
 
 
 # Set the mouse callback function for both
@@ -39,21 +35,23 @@ cv2.setMouseCallback("Grayscale", mouse_callback)
 # Initialize cursor position
 cursor_x, cursor_y = 0, 0
 
-def main():
-    cap = cv2.VideoCapture("/dev/video-infiray")
-    # cap = cv2.VideoCapture(3)
-    # Set the camera resolution to 256x384 explicitly
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 256)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 384)
-    cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
-    # Fetch undecoded RAW video streams
-    cap.set(cv2.CAP_PROP_FORMAT, -1)
-    print(cap)
+cap = cv2.VideoCapture("/dev/video-infiray")
 
+# Set the camera resolution to 256x384 explicitly
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 256)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 384)
+cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
+
+# Fetch undecoded RAW video streams
+cap.set(cv2.CAP_PROP_FORMAT, -1)
+
+def main():
     if not cap.isOpened():
         raise ValueError("Cannot open camera")
 
     try:
+        flip_x = False
+        flip_y = False
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -74,12 +72,15 @@ def main():
             temperature = temperature_c[cursor_y//temp_scale, cursor_x//temp_scale]
             temperature_text = f" {temperature:.1f} C"
 
-            # Normalize the temperature data between the min_temp and max_temp range
-            normalized_temperature = np.clip((temperature_c - min_temp) / (max_temp - min_temp), 0, 1)
-            normalized_temperature = np.uint8(normalized_temperature * 255)
+            if flip_x and flip_y:
+                gray_upper = cv2.flip(gray_upper, -1)
+            elif flip_x:
+                gray_upper = cv2.flip(gray_upper, 0)
+            elif flip_y:
+                gray_upper = cv2.flip(gray_upper, 1)
 
             # Apply the selected color map to the grayscale image
-            colormap_idx = getattr(cv2, "COLORMAP_MAGMA")
+            colormap_idx = getattr(cv2, selected_cmap)
             color_mapped_gray = cv2.applyColorMap(gray_upper, colormap_idx)
 
             color_mapped_gray_resized = cv2.resize(color_mapped_gray, None, fx=temp_scale, fy=temp_scale,
@@ -90,16 +91,17 @@ def main():
 
             cv2.imshow("Grayscale", color_mapped_gray_resized)
 
-            img_with_temp = cv2.resize(normalized_temperature, None, fx=temp_scale, fy=temp_scale,
-                                       interpolation=cv2.INTER_NEAREST_EXACT)
-
-            cv2.circle(img_with_temp, (cursor_x, cursor_y), 2, (255, 255, 255), 1)
-            cv2.putText(img_with_temp, temperature_text, (cursor_x, cursor_y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-            if cv2.waitKey(1) == ord("q"):
+            key = cv2.waitKey(1)
+            if key == ord("q"):
                 break
+            if key == ord("x"):
+                flip_x = not flip_x
+            if key == ord("y"):
+                flip_y = not flip_y
 
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
