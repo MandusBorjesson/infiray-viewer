@@ -16,6 +16,7 @@ dependencies = [
     "opencv-python==4.10.0.84",
     "numpy==2.2.1",
     "tk==0.1.0",
+    "pillow==11.2.1",
 ]
 
 [project.scripts]
