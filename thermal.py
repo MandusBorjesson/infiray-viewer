@@ -19,11 +19,6 @@ def yuyv422_to_gray16le(img):
 def kelvin_to_celsius(kelvin):
     return kelvin - 273.15
 
-def mouse_callback(event, x, y, flags, param):
-    global cursor_x, cursor_y
-    if event == cv2.EVENT_MOUSEMOVE:
-        cursor_x, cursor_y = x, y
-
 class ThermalCamera():
     def __init__(self, path):
         self._path = path
@@ -69,71 +64,75 @@ class ThermalCamera():
         if self._cam:
             self._cam.release()
 
+class CameraFeed:
+    def __init__(self, parent, webcam_path):
+        self._parent = parent
+        self._webcam = ThermalCamera(webcam_path)
 
-cap = ThermalCamera("/dev/video-infiray")
+        self._widget = tk.Label(master=parent, bg="black", borderwidth=0, highlightthickness=0)
+        self._widget.pack(fill=tk.BOTH, side=tk.LEFT, expand=True)
+        self._widget.bind('<Button-1>', self.mouse_click_cb)
 
-selected_cmap = "COLORMAP_MAGMA"
-temp_scale = 4
+        self._size = (self._widget.winfo_width(), self._widget.winfo_height())
+        self._widget.bind('<Configure>', self.size_changed_cb)
 
-# cv2.resizeWindow("Grayscale", 800, 600)
+        self._widget.after(1, self.update)
 
+    def mouse_click_cb(self, args):
+        print(f"mouseclick, {args}")
 
-# Initialize cursor position
-cursor_x, cursor_y = 0, 0
+    def size_changed_cb(self, args):
+        self._size = (args.width, args.height)
 
+    def close(self):
+        if self._webcam:
+            self._webcam.close()
 
-def handle_keypress(event):
-    """Print the character associated to the key pressed"""
-    print(event.char)
+    def update(self):
+        # Capture the video frame by frame
+        ret = self._webcam.read()
+        if not ret:
+            self._widget.after(5000, self.update)
+            return
 
-def update_camera_feed(webcam, widget):
+        # Split the frame into upper and lower halves
+        upper_frame, _ = ret
 
-    # Capture the video frame by frame
-    ret = webcam.read()
-    if not ret:
-        widget.after(5000, update_camera_feed, webcam, widget)
-        return
+        # Convert the upper frame to grayscale
+        gray_upper = yuyv422_to_gray(upper_frame)
+        opencv_image = gray_upper
 
-    # Split the frame into upper and lower halves
-    upper_frame, _ = ret
+        # Apply the selected color map to the grayscale image
+        opencv_image = cv2.applyColorMap(gray_upper, cv2.COLORMAP_MAGMA)
+        captured_image = Image.fromarray(opencv_image)
 
-    # Convert the upper frame to grayscale
-    gray_upper = yuyv422_to_gray(upper_frame)
-    opencv_image = gray_upper
+        captured_image = ImageOps.contain(captured_image, self._size, method=Image.Resampling.NEAREST)
 
-    # Apply the selected color map to the grayscale image
-    opencv_image = cv2.applyColorMap(gray_upper, cv2.COLORMAP_MAGMA)
-    captured_image = Image.fromarray(opencv_image)
+        photo_image = ImageTk.PhotoImage(image=captured_image)
 
-    widget_size = (widget.winfo_width(), widget.winfo_height())
-    captured_image = ImageOps.contain(captured_image, widget_size, method=Image.Resampling.NEAREST)
+        # Displaying photoimage in the label
+        self._widget.photo_image = photo_image
 
-    photo_image = ImageTk.PhotoImage(image=captured_image)
+        # Configure image in the label
+        self._widget.configure(image=photo_image)
 
-    # Displaying photoimage in the label
-    widget.photo_image = photo_image
+        self._widget.after(1, self.update)
 
-    # Configure image in the label
-    widget.configure(image=photo_image)
-
-    widget.after(1, update_camera_feed, webcam, widget)
 
 def main():
     window = tk.Tk()
-    # window["bg"] = "black"
     window.bind('<q>', lambda e: window.quit())
+    window.bind('<Button-1>', lambda e: print("Hej"))
 
-    camera_feed = tk.Label(master=window, bg="black", borderwidth=0, highlightthickness=0)
-    camera_feed.pack(fill=tk.BOTH, side=tk.LEFT, expand=True)
+    feed = CameraFeed(window, "/dev/video-infiray")
 
-    frame2 = tk.Frame(master=window, width=100, bg="yellow")
+    frame2 = tk.Frame(master=window, width=200, bg="gray")
     frame2.pack(fill=tk.BOTH, side=tk.LEFT)
 
-    update_camera_feed(cap, camera_feed)
     try:
         window.mainloop()
     finally:
-        cap.close()
+        feed.close()
 
 
 if __name__ == "__main__":
